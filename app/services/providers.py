@@ -182,3 +182,27 @@ class ProviderManager:
             )
 
         return default
+
+    def get_model_name(self, provider: ProviderType) -> str:
+        """
+        Get the configured model name for a provider.
+
+        Args:
+            provider: Provider type
+
+        Returns:
+            Model name
+
+        Raises:
+            ProviderNotConfiguredError: If the provider is not configured
+        """
+        if provider == ProviderType.OPENAI:
+            if not self.config.openai or not self.config.openai.enabled:
+                raise ProviderNotConfiguredError("OpenAI provider is not configured or enabled")
+            return self.config.openai.model
+        elif provider == ProviderType.XAI:
+            if not self.config.xai or not self.config.xai.enabled:
+                raise ProviderNotConfiguredError("XAI provider is not configured or enabled")
+            return self.config.xai.model
+        else:
+            raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
