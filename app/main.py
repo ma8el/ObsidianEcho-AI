@@ -1,0 +1,79 @@
+"""Main FastAPI application."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import health_router
+from app.core.config import get_settings
+from app.core.logging import get_logger, setup_logging
+
+settings = get_settings()
+setup_logging(settings)
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """
+    Application lifespan manager.
+
+    Handles startup and shutdown events.
+    """
+    # Startup
+    logger.info(
+        "Starting ObsidianEcho-AI service",
+        extra={"version": settings.version, "debug": settings.debug},
+    )
+    yield
+    # Shutdown
+    logger.info("Shutting down ObsidianEcho-AI service")
+
+
+def create_app() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+
+    Returns:
+        FastAPI: Configured FastAPI application instance
+    """
+    app = FastAPI(
+        title=settings.app_name,
+        description="AI-powered agents for generating Obsidian markdown notes",
+        version=settings.version,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        lifespan=lifespan,
+        debug=settings.debug,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(health_router)
+
+    logger.info("FastAPI application created successfully")
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        log_level=settings.log_level.lower(),
+    )

@@ -1,0 +1,47 @@
+# ObsidianEcho-AI Configuration Example
+# Copy this file to main.yaml and customize
+
+# Application Settings
+app_name: "ObsidianEcho-AI"
+version: "0.1.0"
+debug: false
+
+# Server Settings
+host: "0.0.0.0"
+port: 8000
+
+# Logging
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_format: "json"  # json or text
+
+# CORS Settings
+cors_origins:
+  - "*"  # Configure for production
+
+# AI Provider Settings (to be added in future stories)
+# providers:
+#   openai:
+#     api_key: "your-openai-api-key"
+#     model: "gpt-4"
+#   xai:
+#     api_key: "your-xai-api-key"
+#     model: "grok-beta"
+
+# Agent Settings (to be added in future stories)
+# agents:
+#   research:
+#     default_depth: "standard"
+#     timeout_seconds: 300
+#   template:
+#     templates_dir: "config/templates"
+
+# Rate Limiting (to be added in future stories)
+# rate_limits:
+#   default:
+#     requests_per_minute: 10
+#     requests_per_hour: 100
+
+# Task Queue (to be added in future stories)
+# task_queue:
+#   max_workers: 4
+#   task_timeout_seconds: 600
