@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+.eggs
+.venv
+venv
+env
+ENV
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
+.hypothesis
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+# README.md is needed for package metadata
+# LICENSE
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Development tools
+.pre-commit-config.yaml
+.ruff_cache
+.mypy_cache
+
+# Local config (use example.yaml instead)
+config/main.yaml
+config/*_local.yaml
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
