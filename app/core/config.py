@@ -9,6 +9,8 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.models.auth import APIKeyConfig
+
 
 class ProviderConfig(BaseModel):
     """Configuration for an AI provider."""
@@ -25,6 +27,13 @@ class ProvidersConfig(BaseModel):
     openai: ProviderConfig | None = Field(default=None, description="OpenAI configuration")
     xai: ProviderConfig | None = Field(default=None, description="XAI configuration")
     default_provider: str = Field(default="openai", description="Default provider to use")
+
+
+class AuthConfig(BaseModel):
+    """Authentication configuration."""
+
+    enabled: bool = Field(default=True, description="Whether authentication is enabled")
+    api_keys: list[APIKeyConfig] = Field(default_factory=list, description="List of valid API keys")
 
 
 class Settings(BaseSettings):
@@ -50,6 +59,9 @@ class Settings(BaseSettings):
     providers: ProvidersConfig = Field(
         default_factory=ProvidersConfig, description="AI provider configurations"
     )
+
+    # Authentication
+    auth: AuthConfig = Field(default_factory=AuthConfig, description="Authentication configuration")
 
     # Configuration file path
     config_file: str = Field(
@@ -88,6 +100,8 @@ class Settings(BaseSettings):
                 # Handle nested configurations for Pydantic models
                 if key == "providers" and isinstance(value, dict):
                     self.providers = ProvidersConfig(**value)
+                elif key == "auth" and isinstance(value, dict):
+                    self.auth = AuthConfig(**value)
                 else:
                     setattr(self, key, value)
 

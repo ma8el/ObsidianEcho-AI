@@ -12,7 +12,10 @@ def test_health_check_sync(test_app: TestClient) -> None:
     Args:
         test_app: Test client fixture
     """
-    response = test_app.get("/health")
+    # Use the default test API key from config
+    response = test_app.get(
+        "/health", headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"}
+    )
 
     assert response.status_code == 200
 
@@ -31,7 +34,10 @@ async def test_health_check_async(async_client: AsyncClient) -> None:
     Args:
         async_client: Async test client fixture
     """
-    response = await async_client.get("/health")
+    # Use the default test API key from config
+    response = await async_client.get(
+        "/health", headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"}
+    )
 
     assert response.status_code == 200
 
@@ -49,7 +55,10 @@ def test_health_check_response_schema(test_app: TestClient) -> None:
     Args:
         test_app: Test client fixture
     """
-    response = test_app.get("/health")
+    # Use the default test API key from config
+    response = test_app.get(
+        "/health", headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"}
+    )
 
     data = response.json()
 

@@ -18,6 +18,23 @@ log_format: "json"  # json or text
 cors_origins:
   - "*"  # Configure for production
 
+# Authentication Settings
+# API keys are used to authenticate requests to the API
+auth:
+  enabled: true  # Set to false to disable authentication (not recommended for production)
+  api_keys:
+    # Example API key - generate your own using the security utilities
+    # Format: oea_<32 hex characters>
+    - key_id: "production-key-1"
+      name: "Production API Key"
+      key: "oea_0123456789abcdef0123456789abcdef"  # CHANGE THIS!
+      status: "active"  # active or revoked
+    # You can add multiple keys for different services/users
+    # - key_id: "service-key-1"
+    #   name: "Integration Service"
+    #   key: "oea_abcdef0123456789abcdef0123456789"
+    #   status: "active"
+
 # AI Provider Settings
 # API keys must be set via environment variables:
 #   - OpenAI: export OPENAI_API_KEY="sk-..."  (get from https://platform.openai.com/api-keys)

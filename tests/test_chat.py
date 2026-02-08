@@ -122,7 +122,11 @@ class TestChatEndpoint:
             model="gpt-4o",
         )
 
-        response = client.post("/chat", json={"message": "Hello"})
+        response = client.post(
+            "/chat",
+            json={"message": "Hello"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -139,14 +143,22 @@ class TestChatEndpoint:
             model="gpt-4o",
         )
 
-        response = client.post("/chat", json={"message": "Test", "provider": "openai"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test", "provider": "openai"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 200
         mock_chat.assert_called_once()
 
     def test_chat_endpoint_invalid_message(self, client: TestClient) -> None:
         """Test chat request with invalid message."""
-        response = client.post("/chat", json={})
+        response = client.post(
+            "/chat",
+            json={},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 422  # Validation error
 
@@ -157,7 +169,11 @@ class TestChatEndpoint:
         mock_chat = mocker.patch("app.api.routes.chat.chat_agent.chat")
         mock_chat.side_effect = ProviderNotConfiguredError("Provider not available")
 
-        response = client.post("/chat", json={"message": "Test"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 400
         assert "Provider not available" in response.json()["detail"]
@@ -167,7 +183,18 @@ class TestChatEndpoint:
         mock_chat = mocker.patch("app.api.routes.chat.chat_agent.chat")
         mock_chat.side_effect = Exception("Something went wrong")
 
-        response = client.post("/chat", json={"message": "Test"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 500
         assert "Chat request failed" in response.json()["detail"]
+
+    def test_chat_endpoint_requires_auth(self, client: TestClient) -> None:
+        """Test that chat endpoint requires authentication."""
+        response = client.post("/chat", json={"message": "Test"})
+
+        assert response.status_code == 401
+        assert "API key is required" in response.json()["detail"]
