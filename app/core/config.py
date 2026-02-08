@@ -6,8 +6,25 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ProviderConfig(BaseModel):
+    """Configuration for an AI provider."""
+
+    enabled: bool = Field(default=True, description="Whether this provider is enabled")
+    model: str = Field(description="Default model to use")
+    timeout_seconds: int = Field(default=60, description="Request timeout in seconds")
+    max_retries: int = Field(default=3, description="Maximum number of retries")
+
+
+class ProvidersConfig(BaseModel):
+    """Configuration for all AI providers."""
+
+    openai: ProviderConfig | None = Field(default=None, description="OpenAI configuration")
+    xai: ProviderConfig | None = Field(default=None, description="XAI configuration")
+    default_provider: str = Field(default="openai", description="Default provider to use")
 
 
 class Settings(BaseSettings):
@@ -28,6 +45,11 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = Field(default=["*"], description="Allowed CORS origins")
+
+    # AI Providers
+    providers: ProvidersConfig = Field(
+        default_factory=ProvidersConfig, description="AI provider configurations"
+    )
 
     # Configuration file path
     config_file: str = Field(
@@ -63,7 +85,11 @@ class Settings(BaseSettings):
 
         for key, value in yaml_config.items():
             if hasattr(self, key):
-                setattr(self, key, value)
+                # Handle nested configurations for Pydantic models
+                if key == "providers" and isinstance(value, dict):
+                    self.providers = ProvidersConfig(**value)
+                else:
+                    setattr(self, key, value)
 
 
 @lru_cache

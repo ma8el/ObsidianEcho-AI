@@ -18,14 +18,27 @@ log_format: "json"  # json or text
 cors_origins:
   - "*"  # Configure for production
 
-# AI Provider Settings (to be added in future stories)
-# providers:
-#   openai:
-#     api_key: "your-openai-api-key"
-#     model: "gpt-4"
-#   xai:
-#     api_key: "your-xai-api-key"
-#     model: "grok-beta"
+# AI Provider Settings
+# API keys must be set via environment variables:
+#   - OpenAI: export OPENAI_API_KEY="sk-..."  (get from https://platform.openai.com/api-keys)
+#   - XAI:    export XAI_API_KEY="xai-..."    (get from https://console.x.ai)
+providers:
+  # Default provider to use when none is specified
+  default_provider: "openai"
+
+  # OpenAI Configuration
+  openai:
+    enabled: true
+    model: "gpt-4o"  # Options: gpt-4o, gpt-4-turbo, gpt-3.5-turbo, etc.
+    timeout_seconds: 60
+    max_retries: 3
+
+  # xAI Configuration (optional)
+  xai:
+    enabled: false
+    model: "grok-beta"  # Options: grok-beta, grok-2, etc.
+    timeout_seconds: 60
+    max_retries: 3
 
 # Agent Settings (to be added in future stories)
 # agents:
