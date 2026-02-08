@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obsidianecho-ai
+    ports:
+      - "8000:8000"
+    environment:
+      # Override config with environment variables
+      - OEA_DEBUG=true
+      - OEA_LOG_LEVEL=INFO
+      - OEA_LOG_FORMAT=text
+      # AI Provider API Keys (required - agno reads these directly)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - XAI_API_KEY=${XAI_API_KEY}  # Uncomment if using XAI
+    volumes:
+      # Mount config directory for easy updates
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Future: Add Redis for task queue
+#   redis:
+#     image: redis:7-alpine
+#     container_name: obsidianecho-redis
+#     ports:
+#       - "6379:6379"
+#     restart: unless-stopped
+
+# Future: Add PostgreSQL for history/data
+#   postgres:
+#     image: postgres:16-alpine
+#     container_name: obsidianecho-postgres
+#     environment:
+#       - POSTGRES_DB=obsidianecho
+#       - POSTGRES_USER=obsidianecho
+#       - POSTGRES_PASSWORD=changeme
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     restart: unless-stopped
+
+# volumes:
+#   postgres_data:

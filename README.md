@@ -43,6 +43,8 @@ ObsidianEcho-AI acts as a bridge between AI capabilities and Obsidian vaults, en
 
 ### Installation
 
+#### Option 1: Local Development with uv
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/ObsidianEcho-AI.git
@@ -51,21 +53,53 @@ cd ObsidianEcho-AI
 # Install dependencies with uv
 uv sync
 
-# Copy example configuration
-cp config/example.yaml config/main.yaml
+# Set up environment variables
+cp .env.example .env
+# Edit .env and add your API keys:
+#   OPENAI_API_KEY=sk-your-key-here
+```
 
-# Edit config with your API keys
-# Edit config/main.yaml and add your provider API keys
+#### Option 2: Docker
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ObsidianEcho-AI.git
+cd ObsidianEcho-AI
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env and add your API keys
+
+# Run with docker-compose
+docker-compose up -d
 ```
 
 ### Running the Service
 
+#### With uv (Local Development)
+
 ```bash
-# Run with uv
-uv run fastapi dev app/main.py
+# Set your API key
+export OPENAI_API_KEY="sk-your-key-here"
+
+# Run the service
+uv run python -m app.main
 
 # Service will be available at http://localhost:8000
 # API documentation at http://localhost:8000/docs
+```
+
+#### With Docker
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
 ```
 
 ## Project Status
@@ -145,14 +179,30 @@ curl http://localhost:8000/tasks/{task_id}/result \
 
 ## Configuration
 
-Configuration is managed through YAML files in the `config/` directory:
+### Environment Variables
 
-- `main.yaml` - Core service settings
-- `providers.yaml` - AI provider credentials
-- `agents.yaml` - Agent-specific configuration
-- `templates/` - Template library
+API keys **must** be set via environment variables:
 
-See documentation for detailed configuration options.
+```bash
+# Required
+export OPENAI_API_KEY="sk-your-openai-key"
+
+# Optional (if using XAI/Grok)
+export XAI_API_KEY="xai-your-xai-key"
+```
+
+For Docker, set these in a `.env` file (see `.env.example`).
+
+### Configuration Files
+
+Additional settings are managed through `config/main.yaml`:
+
+- Provider settings (model names, timeouts, retries)
+- Server settings (host, port, debug mode)
+- Logging configuration
+- CORS settings
+
+See `config/example.yaml` for all available options.
 
 ## Development
 
