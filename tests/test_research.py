@@ -108,6 +108,32 @@ class TestResearchAgent:
         assert "No explicit citations were returned" in result.markdown
         assert result.sources == []
 
+    @pytest.mark.asyncio
+    async def test_research_strips_wrapping_markdown_fences(
+        self,
+        research_agent: ResearchAgent,
+        provider_manager: ProviderManager,
+        mocker: MockerFixture,
+    ) -> None:
+        """Research formatting should remove outer ```markdown fences."""
+        run_output = RunOutput(
+            content="```markdown\n# Title\n\n## Overview\n\nBody text.\n```",
+            model="gpt-4o",
+            metrics=Metrics(total_tokens=10, duration=0.1),
+        )
+
+        mocker.patch.object(
+            provider_manager,
+            "run_with_fallback",
+            new=mocker.AsyncMock(return_value=(run_output, ProviderType.OPENAI)),
+        )
+
+        result = await research_agent.research(topic="Title")
+
+        assert "```markdown" not in result.markdown
+        assert "\n```" not in result.markdown
+        assert "# Title" in result.markdown
+
 
 class TestResearchEndpoint:
     """Integration tests for research endpoint."""
@@ -211,3 +237,33 @@ class TestResearchEndpoint:
         response = client.post("/agents/research", json={"topic": "AI safety"})
 
         assert response.status_code == 401
+
+    def test_research_endpoint_raw_markdown_response(
+        self, client: TestClient, mocker: MockerFixture
+    ) -> None:
+        """Endpoint should return copy-paste-ready markdown when requested."""
+        response_payload = ResearchResponse(
+            topic="AI safety",
+            markdown="---\ntitle: AI safety\n---\n\n# AI safety\n\n## Overview\n\nText",
+            sources=[],
+            metadata=ResearchMetadata(
+                provider=ProviderType.OPENAI,
+                model="gpt-4o",
+                depth=ResearchDepth.STANDARD,
+                duration_seconds=1.1,
+                tokens_used=123,
+                sources_count=0,
+            ),
+        )
+        mock_research = mocker.patch("app.api.routes.research.research_agent.research")
+        mock_research.return_value = response_payload
+
+        response = client.post(
+            "/agents/research?as_markdown=true",
+            json={"topic": "AI safety"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/markdown")
+        assert response.text == response_payload.markdown

@@ -61,6 +61,15 @@ class ResearchAgent:
         return "\n".join(prompt_lines)
 
     @staticmethod
+    def _strip_wrapping_markdown_fence(body: str) -> str:
+        """Strip a single wrapping fenced markdown block if present."""
+        text = body.strip()
+        fenced_match = re.match(r"^```(?:markdown|md)?\s*\n(?P<body>[\s\S]*?)\n```$", text)
+        if fenced_match:
+            return fenced_match.group("body").strip()
+        return text
+
+    @staticmethod
     def _extract_sources(run_output: RunOutput) -> list[SourceReference]:
         citations = getattr(run_output, "citations", None)
         urls = getattr(citations, "urls", None) if citations is not None else None
@@ -137,7 +146,7 @@ class ResearchAgent:
         body: str,
         sources: list[SourceReference],
     ) -> str:
-        normalized_body = body.strip()
+        normalized_body = self._strip_wrapping_markdown_fence(body)
         title = self._extract_title(topic, normalized_body)
 
         if not re.search(r"^#\s+", normalized_body, flags=re.MULTILINE):

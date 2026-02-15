@@ -1,6 +1,7 @@
 """Research agent API endpoint."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import PlainTextResponse
 
 from app.agents.research import ResearchAgent
 from app.api.middleware import get_current_api_key
@@ -25,16 +26,20 @@ research_agent = ResearchAgent(provider_manager)
 @router.post("/research", response_model=ResearchResponse)
 async def research(
     request: ResearchRequest,
+    as_markdown: bool = False,
     api_key: APIKey = Depends(get_current_api_key),
-) -> ResearchResponse:
+) -> ResearchResponse | PlainTextResponse:
     """Run synchronous research and return an Obsidian markdown note."""
     try:
-        return await research_agent.research(
+        response = await research_agent.research(
             topic=request.topic,
             depth=request.depth,
             provider=request.provider,
             focus_areas=request.focus_areas,
         )
+        if as_markdown:
+            return PlainTextResponse(content=response.markdown, media_type="text/markdown")
+        return response
     except ProviderNotConfiguredError as exc:
         logger.error("Research provider not configured", extra={"error": str(exc)})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
