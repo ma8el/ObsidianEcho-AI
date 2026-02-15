@@ -115,10 +115,10 @@ This project is currently being built following the implementation stories in [d
 - [x] **Story 3**: API Authentication & Security
 - [x] **Story 4**: Research Agent Core Implementation
 - [x] **Story 5**: Research Agent API Endpoints
-- [ ] **Story 6**: Template Agent with Jinja2
-- [ ] **Story 7**: Template Agent API Endpoints
-- [ ] **Story 8**: Asynchronous Task Queue System
-- [ ] **Story 9**: Task Management API Endpoints
+- [ ] ~~**Story 6**: Template Agent with Jinja2~~ (deferred)
+- [ ] ~~**Story 7**: Template Agent API Endpoints~~ (deferred)
+- [x] **Story 8**: Asynchronous Task Queue System
+- [x] **Story 9**: Task Management API Endpoints
 - [ ] **Story 10**: Rate Limiting System
 - [ ] **Story 11**: Request History & Logging
 - [ ] **Story 12**: Webhook Notification System

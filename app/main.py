@@ -7,9 +7,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.middleware import RequestIDMiddleware
-from app.api.routes import chat_router, health_router, research_router
+from app.api.routes import chat_router, health_router, research_router, tasks_router
+from app.api.routes.tasks import create_task_executor
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
+from app.services.tasks import TaskManager
 
 settings = get_settings()
 setup_logging(settings)
@@ -28,8 +30,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "Starting ObsidianEcho-AI service",
         extra={"version": settings.version, "debug": settings.debug},
     )
+
+    task_manager = TaskManager(
+        executor=create_task_executor(settings),
+        max_workers=2,
+        task_ttl_seconds=3600,
+        cleanup_interval_seconds=30,
+    )
+    await task_manager.start()
+    app.state.task_manager = task_manager
+
     yield
     # Shutdown
+    await app.state.task_manager.shutdown()
     logger.info("Shutting down ObsidianEcho-AI service")
 
 
@@ -65,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(chat_router)
     app.include_router(research_router)
+    app.include_router(tasks_router)
 
     logger.info("FastAPI application created successfully")
 
