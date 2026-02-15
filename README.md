@@ -113,8 +113,8 @@ This project is currently being built following the implementation stories in [d
 - [x] **Story 1**: Project Foundation & Setup
 - [x] **Story 2**: AI Provider Integration with agno
 - [x] **Story 3**: API Authentication & Security
-- [ ] **Story 4**: Research Agent Core Implementation
-- [ ] **Story 5**: Research Agent API Endpoints
+- [x] **Story 4**: Research Agent Core Implementation
+- [x] **Story 5**: Research Agent API Endpoints
 - [ ] **Story 6**: Template Agent with Jinja2
 - [ ] **Story 7**: Template Agent API Endpoints
 - [ ] **Story 8**: Asynchronous Task Queue System
