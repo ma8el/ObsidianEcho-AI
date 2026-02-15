@@ -34,6 +34,29 @@ def providers_config(openai_config: ProviderConfig) -> ProvidersConfig:
 
 
 @pytest.fixture
+def xai_config() -> ProviderConfig:
+    """Create XAI provider config for testing."""
+    return ProviderConfig(
+        enabled=True,
+        model="grok-beta",
+        timeout_seconds=30,
+        max_retries=2,
+    )
+
+
+@pytest.fixture
+def providers_config_both(
+    openai_config: ProviderConfig, xai_config: ProviderConfig
+) -> ProvidersConfig:
+    """Create providers config with OpenAI and XAI enabled."""
+    return ProvidersConfig(
+        openai=openai_config,
+        xai=xai_config,
+        default_provider="openai",
+    )
+
+
+@pytest.fixture
 def provider_manager(providers_config: ProvidersConfig) -> ProviderManager:
     """Create provider manager for testing."""
     return ProviderManager(providers_config)
@@ -103,6 +126,48 @@ class TestChatAgent:
 
         assert response.reply == "Direct string response"
 
+    @pytest.mark.asyncio
+    async def test_chat_fallback_to_secondary_provider_on_runtime_failure(
+        self, providers_config_both: ProvidersConfig, mocker: MockerFixture
+    ) -> None:
+        """Test chat falls back to secondary provider when first one fails."""
+        chat_agent = ChatAgent(ProviderManager(providers_config_both))
+
+        async def run_side_effect(message: str, provider: ProviderType) -> tuple[str, str]:
+            if provider == ProviderType.OPENAI:
+                raise RuntimeError("OpenAI unavailable")
+            return "Fallback response", "grok-beta"
+
+        mock_chat_with_provider = mocker.patch.object(chat_agent, "_chat_with_provider")
+        mock_chat_with_provider.side_effect = run_side_effect
+
+        response = await chat_agent.chat("Test")
+
+        assert response.reply == "Fallback response"
+        assert response.provider == ProviderType.XAI
+        assert response.model == "grok-beta"
+
+    @pytest.mark.asyncio
+    async def test_chat_fallback_when_requested_provider_fails(
+        self, providers_config_both: ProvidersConfig, mocker: MockerFixture
+    ) -> None:
+        """Test fallback still applies when a specific provider is requested."""
+        chat_agent = ChatAgent(ProviderManager(providers_config_both))
+
+        async def run_side_effect(message: str, provider: ProviderType) -> tuple[str, str]:
+            if provider == ProviderType.OPENAI:
+                raise RuntimeError("OpenAI unavailable")
+            return "Recovered", "grok-beta"
+
+        mock_chat_with_provider = mocker.patch.object(chat_agent, "_chat_with_provider")
+        mock_chat_with_provider.side_effect = run_side_effect
+
+        response = await chat_agent.chat("Test", provider=ProviderType.OPENAI)
+
+        assert response.reply == "Recovered"
+        assert response.provider == ProviderType.XAI
+        assert response.model == "grok-beta"
+
 
 class TestChatEndpoint:
     """Test chat API endpoint."""
@@ -122,7 +187,11 @@ class TestChatEndpoint:
             model="gpt-4o",
         )
 
-        response = client.post("/chat", json={"message": "Hello"})
+        response = client.post(
+            "/chat",
+            json={"message": "Hello"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -139,14 +208,22 @@ class TestChatEndpoint:
             model="gpt-4o",
         )
 
-        response = client.post("/chat", json={"message": "Test", "provider": "openai"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test", "provider": "openai"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 200
         mock_chat.assert_called_once()
 
     def test_chat_endpoint_invalid_message(self, client: TestClient) -> None:
         """Test chat request with invalid message."""
-        response = client.post("/chat", json={})
+        response = client.post(
+            "/chat",
+            json={},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 422  # Validation error
 
@@ -157,7 +234,11 @@ class TestChatEndpoint:
         mock_chat = mocker.patch("app.api.routes.chat.chat_agent.chat")
         mock_chat.side_effect = ProviderNotConfiguredError("Provider not available")
 
-        response = client.post("/chat", json={"message": "Test"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 400
         assert "Provider not available" in response.json()["detail"]
@@ -167,7 +248,18 @@ class TestChatEndpoint:
         mock_chat = mocker.patch("app.api.routes.chat.chat_agent.chat")
         mock_chat.side_effect = Exception("Something went wrong")
 
-        response = client.post("/chat", json={"message": "Test"})
+        response = client.post(
+            "/chat",
+            json={"message": "Test"},
+            headers={"X-API-Key": "oea_0123456789abcdef0123456789abcdef"},
+        )
 
         assert response.status_code == 500
         assert "Chat request failed" in response.json()["detail"]
+
+    def test_chat_endpoint_requires_auth(self, client: TestClient) -> None:
+        """Test that chat endpoint requires authentication."""
+        response = client.post("/chat", json={"message": "Test"})
+
+        assert response.status_code == 401
+        assert "API key is required" in response.json()["detail"]

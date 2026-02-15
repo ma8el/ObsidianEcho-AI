@@ -1,10 +1,12 @@
 """Chat endpoint for testing provider integration."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.chat import ChatAgent
+from app.api.middleware import get_current_api_key
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.models.auth import APIKey
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.providers import ProviderManager, ProviderNotConfiguredError
 
@@ -18,7 +20,10 @@ chat_agent = ChatAgent(provider_manager)
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest,
+    api_key: APIKey = Depends(get_current_api_key),
+) -> ChatResponse:
     """
     Send a message to the chat agent and get a response.
 
@@ -26,6 +31,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
     Args:
         request: Chat request with message and optional provider
+        api_key: API key from authentication (injected)
 
     Returns:
         Chat response with reply and metadata

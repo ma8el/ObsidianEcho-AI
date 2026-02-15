@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.middleware import RequestIDMiddleware
 from app.api.routes import chat_router, health_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
@@ -49,6 +50,10 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
+    # Add Request ID middleware (should be first to track all requests)
+    app.add_middleware(RequestIDMiddleware)
+
+    # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

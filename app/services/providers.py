@@ -1,11 +1,15 @@
 """Provider management and agno integration."""
 
+import os
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
+
 from agno.models.openai import OpenAIChat
 from agno.models.xai import xAI
 
 from app.core.config import ProvidersConfig
 from app.core.logging import get_logger
-from app.models.providers import ProviderType
+from app.models.providers import ProviderHealth, ProviderType
 
 logger = get_logger(__name__)
 
@@ -20,6 +24,23 @@ class ProviderNotConfiguredError(ProviderError):
     """Raised when a provider is not configured."""
 
     pass
+
+
+class ProviderExecutionError(ProviderError):
+    """Raised when all provider execution attempts fail."""
+
+    def __init__(
+        self,
+        message: str,
+        attempted_providers: list[ProviderType],
+        last_error: Exception,
+    ) -> None:
+        super().__init__(message)
+        self.attempted_providers = attempted_providers
+        self.last_error = last_error
+
+
+T = TypeVar("T")
 
 
 class ProviderManager:
@@ -116,6 +137,11 @@ class ProviderManager:
         config = self.config.openai
         return OpenAIChat(
             id=config.model,
+            timeout=config.timeout_seconds,
+            max_retries=config.max_retries,
+            retries=config.max_retries,
+            delay_between_retries=1,
+            exponential_backoff=True,
         )
 
     def _get_xai_model(self) -> xAI:
@@ -136,6 +162,8 @@ class ProviderManager:
         config = self.config.xai
         return xAI(
             id=config.model,
+            timeout=config.timeout_seconds,
+            max_retries=config.max_retries,
             retries=config.max_retries,
             delay_between_retries=1,
             exponential_backoff=True,
@@ -206,3 +234,161 @@ class ProviderManager:
             return self.config.xai.model
         else:
             raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+    def check_provider_health(self, provider: ProviderType) -> ProviderHealth:
+        """
+        Check health status for a provider.
+
+        Health is considered "ready" when:
+        - provider is configured and enabled
+        - provider API key exists in the environment
+        - model instance can be created
+        """
+        if provider == ProviderType.OPENAI:
+            config = self.config.openai
+            env_var = "OPENAI_API_KEY"
+        elif provider == ProviderType.XAI:
+            config = self.config.xai
+            env_var = "XAI_API_KEY"
+        else:
+            raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+        if config is None:
+            return ProviderHealth(
+                provider=provider,
+                enabled=False,
+                model=None,
+                api_key_present=False,
+                healthy=False,
+                reason="Provider not configured",
+            )
+
+        api_key_present = bool(os.getenv(env_var))
+        if not config.enabled:
+            return ProviderHealth(
+                provider=provider,
+                enabled=False,
+                model=config.model,
+                api_key_present=api_key_present,
+                healthy=False,
+                reason="Provider disabled",
+            )
+
+        if not api_key_present:
+            return ProviderHealth(
+                provider=provider,
+                enabled=True,
+                model=config.model,
+                api_key_present=False,
+                healthy=False,
+                reason=f"Missing environment variable: {env_var}",
+            )
+
+        try:
+            self.get_model(provider)
+        except Exception as exc:  # noqa: BLE001
+            return ProviderHealth(
+                provider=provider,
+                enabled=True,
+                model=config.model,
+                api_key_present=True,
+                healthy=False,
+                reason=f"Model initialization failed: {exc}",
+            )
+
+        return ProviderHealth(
+            provider=provider,
+            enabled=True,
+            model=config.model,
+            api_key_present=True,
+            healthy=True,
+            reason="Provider is ready",
+        )
+
+    def get_providers_health(self, include_disabled: bool = True) -> list[ProviderHealth]:
+        """
+        Get health status for all known providers.
+
+        Args:
+            include_disabled: Include disabled/unconfigured providers in output
+
+        Returns:
+            Provider health statuses
+        """
+        providers = [ProviderType.OPENAI, ProviderType.XAI]
+        health = [self.check_provider_health(provider) for provider in providers]
+        if include_disabled:
+            return health
+        return [status for status in health if status.enabled]
+
+    def get_provider_chain(
+        self, preferred_provider: ProviderType | None = None
+    ) -> list[ProviderType]:
+        """
+        Get ordered providers to try for execution.
+
+        Preferred/default provider is tried first, then remaining enabled providers.
+
+        Args:
+            preferred_provider: Preferred provider, or None for configured default
+
+        Returns:
+            Ordered list of providers to attempt
+
+        Raises:
+            ProviderNotConfiguredError: If no providers are available
+        """
+        available = self.get_available_providers()
+        if not available:
+            raise ProviderNotConfiguredError("No providers are configured")
+
+        first = (
+            preferred_provider if preferred_provider is not None else self.get_default_provider()
+        )
+
+        if first not in available:
+            raise ProviderNotConfiguredError(f"{first.value} provider is not configured or enabled")
+
+        return [first, *[provider for provider in available if provider != first]]
+
+    async def run_with_fallback(
+        self,
+        operation: Callable[[ProviderType], Awaitable[T]],
+        preferred_provider: ProviderType | None = None,
+    ) -> tuple[T, ProviderType]:
+        """
+        Execute an async provider operation with fallback to other providers.
+
+        Args:
+            operation: Async callable that executes work for a given provider
+            preferred_provider: Provider to try first, or None for default
+
+        Returns:
+            Tuple of operation result and provider used
+
+        Raises:
+            ProviderExecutionError: If all providers fail during execution
+            ProviderNotConfiguredError: If no valid providers are configured
+        """
+        chain = self.get_provider_chain(preferred_provider)
+        errors: list[tuple[ProviderType, Exception]] = []
+
+        for provider in chain:
+            try:
+                result = await operation(provider)
+                return result, provider
+            except Exception as exc:  # noqa: BLE001
+                errors.append((provider, exc))
+                logger.warning(
+                    "Provider execution failed, trying next provider if available",
+                    extra={"provider": provider.value, "error": str(exc)},
+                )
+
+        attempted = [provider for provider, _ in errors]
+        last_error = errors[-1][1]
+        attempted_str = ", ".join(provider.value for provider in attempted)
+        raise ProviderExecutionError(
+            message=f"All provider execution attempts failed: {attempted_str}",
+            attempted_providers=attempted,
+            last_error=last_error,
+        ) from last_error
