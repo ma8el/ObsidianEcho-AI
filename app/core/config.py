@@ -46,6 +46,47 @@ class HistoryConfig(BaseModel):
     retention_days: int = Field(default=30, description="Retention window for history files")
 
 
+class RateLimitPolicy(BaseModel):
+    """Rate limits for request, token, and cost dimensions."""
+
+    requests_per_minute: int | None = Field(default=None, ge=1)
+    requests_per_hour: int | None = Field(default=None, ge=1)
+    requests_per_day: int | None = Field(default=None, ge=1)
+
+    tokens_per_minute: int | None = Field(default=None, ge=1)
+    tokens_per_hour: int | None = Field(default=None, ge=1)
+    tokens_per_day: int | None = Field(default=None, ge=1)
+
+    cost_per_minute: float | None = Field(default=None, ge=0.0)
+    cost_per_hour: float | None = Field(default=None, ge=0.0)
+    cost_per_day: float | None = Field(default=None, ge=0.0)
+
+
+class RateLimitsConfig(BaseModel):
+    """Global and per-agent rate limiting configuration."""
+
+    enabled: bool = Field(default=True, description="Whether rate limiting is enabled")
+    default: RateLimitPolicy = Field(
+        default_factory=lambda: RateLimitPolicy(
+            requests_per_minute=10_000,
+            requests_per_hour=100_000,
+            requests_per_day=500_000,
+            tokens_per_day=10_000_000,
+            cost_per_day=1_000.0,
+        ),
+        description="Default limits applied to all agents",
+    )
+    agents: dict[str, RateLimitPolicy] = Field(
+        default_factory=dict,
+        description="Optional per-agent limit overrides",
+    )
+    cleanup_interval_seconds: int = Field(
+        default=300,
+        ge=1,
+        description="Interval for in-memory counter cleanup",
+    )
+
+
 class Settings(BaseSettings):
     """Application settings."""
 
@@ -76,6 +117,12 @@ class Settings(BaseSettings):
     # History
     history: HistoryConfig = Field(
         default_factory=HistoryConfig, description="Request/execution history configuration"
+    )
+
+    # Rate limiting
+    rate_limits: RateLimitsConfig = Field(
+        default_factory=RateLimitsConfig,
+        description="API rate limiting configuration",
     )
 
     # Configuration file path
@@ -119,6 +166,8 @@ class Settings(BaseSettings):
                     self.auth = AuthConfig(**value)
                 elif key == "history" and isinstance(value, dict):
                     self.history = HistoryConfig(**value)
+                elif key == "rate_limits" and isinstance(value, dict):
+                    self.rate_limits = RateLimitsConfig(**value)
                 else:
                     setattr(self, key, value)
 

@@ -62,6 +62,15 @@ async def chat(
                 tokens_used=None,
                 estimated_cost=None,
             )
+
+        rate_limiter = getattr(http_request.app.state, "rate_limiter", None)
+        if rate_limiter is not None:
+            await rate_limiter.record_usage(
+                api_key_id=api_key.key_id,
+                agent="chat",
+                tokens=None,
+                estimated_cost=None,
+            )
         return response
 
     except ProviderNotConfiguredError as e:

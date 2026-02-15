@@ -3,7 +3,7 @@
 from contextvars import ContextVar
 from datetime import UTC, datetime
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, Response, status
 from fastapi.security import APIKeyHeader
 
 from app.core.config import get_settings
@@ -141,10 +141,47 @@ def get_api_key_id() -> str:
 
 async def get_authenticated_api_key(
     request: Request,
+    response: Response,
     api_key: APIKey = Depends(get_current_api_key),
 ) -> APIKey:
     """
     Validate API key and store its ID on request state for downstream middleware.
     """
     request.state.api_key_id = api_key.key_id
+
+    rate_limiter = getattr(request.app.state, "rate_limiter", None)
+    if rate_limiter is not None:
+        agent = _resolve_rate_limit_agent(request.url.path)
+        decision = await rate_limiter.consume_request(
+            api_key_id=api_key.key_id,
+            agent=agent,
+        )
+        headers = rate_limiter.build_headers(decision)
+        request.state.rate_limit_headers = headers
+
+        for header_name, header_value in headers.items():
+            response.headers[header_name] = header_value
+
+        if decision is not None and not decision.allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=decision.detail,
+                headers=headers,
+            )
+
     return api_key
+
+
+def _resolve_rate_limit_agent(path: str) -> str:
+    """Map request path to agent-specific rate limit scope."""
+    if path.startswith("/chat"):
+        return "chat"
+    if path.startswith("/agents/research"):
+        return "research"
+    if path.startswith("/tasks"):
+        return "tasks"
+    if path.startswith("/history"):
+        return "history"
+    if path.startswith("/health"):
+        return "health"
+    return "default"

@@ -95,6 +95,10 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         # Add request ID to response headers
         response.headers["X-Request-ID"] = req_id
+        rate_limit_headers = getattr(request.state, "rate_limit_headers", None)
+        if isinstance(rate_limit_headers, dict):
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
 
         # Log response
         logger.info(

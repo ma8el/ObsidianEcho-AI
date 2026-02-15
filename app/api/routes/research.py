@@ -59,6 +59,15 @@ async def research(
                 },
             )
 
+        rate_limiter = getattr(http_request.app.state, "rate_limiter", None)
+        if rate_limiter is not None:
+            await rate_limiter.record_usage(
+                api_key_id=api_key.key_id,
+                agent="research",
+                tokens=response.metadata.tokens_used,
+                estimated_cost=None,
+            )
+
         if as_markdown:
             return PlainTextResponse(content=response.markdown, media_type="text/markdown")
         return response

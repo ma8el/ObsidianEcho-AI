@@ -60,24 +60,22 @@ providers:
     timeout_seconds: 60
     max_retries: 3
 
-# Agent Settings (to be added in future stories)
-# agents:
-#   research:
-#     default_depth: "standard"
-#     timeout_seconds: 300
-#   template:
-#     templates_dir: "config/templates"
-
-# Rate Limiting (to be added in future stories)
-# rate_limits:
-#   default:
-#     requests_per_minute: 10
-#     requests_per_hour: 100
-
-# Task Queue (to be added in future stories)
-# task_queue:
-#   max_workers: 4
-#   task_timeout_seconds: 600
+# Rate Limiting
+rate_limits:
+  enabled: true
+  default:
+    requests_per_minute: 120
+    requests_per_hour: 5000
+    requests_per_day: 50000
+    tokens_per_day: 5000000
+    cost_per_day: 200.0
+  agents:
+    research:
+      requests_per_minute: 30
+      requests_per_hour: 1500
+      tokens_per_day: 3000000
+      cost_per_day: 150.0
+  cleanup_interval_seconds: 300
 
 # Request/Execution History
 history:
