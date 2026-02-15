@@ -1,5 +1,6 @@
 """Provider management and agno integration."""
 
+import os
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
@@ -8,7 +9,7 @@ from agno.models.xai import xAI
 
 from app.core.config import ProvidersConfig
 from app.core.logging import get_logger
-from app.models.providers import ProviderType
+from app.models.providers import ProviderHealth, ProviderType
 
 logger = get_logger(__name__)
 
@@ -233,6 +234,92 @@ class ProviderManager:
             return self.config.xai.model
         else:
             raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+    def check_provider_health(self, provider: ProviderType) -> ProviderHealth:
+        """
+        Check health status for a provider.
+
+        Health is considered "ready" when:
+        - provider is configured and enabled
+        - provider API key exists in the environment
+        - model instance can be created
+        """
+        if provider == ProviderType.OPENAI:
+            config = self.config.openai
+            env_var = "OPENAI_API_KEY"
+        elif provider == ProviderType.XAI:
+            config = self.config.xai
+            env_var = "XAI_API_KEY"
+        else:
+            raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+        if config is None:
+            return ProviderHealth(
+                provider=provider,
+                enabled=False,
+                model=None,
+                api_key_present=False,
+                healthy=False,
+                reason="Provider not configured",
+            )
+
+        api_key_present = bool(os.getenv(env_var))
+        if not config.enabled:
+            return ProviderHealth(
+                provider=provider,
+                enabled=False,
+                model=config.model,
+                api_key_present=api_key_present,
+                healthy=False,
+                reason="Provider disabled",
+            )
+
+        if not api_key_present:
+            return ProviderHealth(
+                provider=provider,
+                enabled=True,
+                model=config.model,
+                api_key_present=False,
+                healthy=False,
+                reason=f"Missing environment variable: {env_var}",
+            )
+
+        try:
+            self.get_model(provider)
+        except Exception as exc:  # noqa: BLE001
+            return ProviderHealth(
+                provider=provider,
+                enabled=True,
+                model=config.model,
+                api_key_present=True,
+                healthy=False,
+                reason=f"Model initialization failed: {exc}",
+            )
+
+        return ProviderHealth(
+            provider=provider,
+            enabled=True,
+            model=config.model,
+            api_key_present=True,
+            healthy=True,
+            reason="Provider is ready",
+        )
+
+    def get_providers_health(self, include_disabled: bool = True) -> list[ProviderHealth]:
+        """
+        Get health status for all known providers.
+
+        Args:
+            include_disabled: Include disabled/unconfigured providers in output
+
+        Returns:
+            Provider health statuses
+        """
+        providers = [ProviderType.OPENAI, ProviderType.XAI]
+        health = [self.check_provider_health(provider) for provider in providers]
+        if include_disabled:
+            return health
+        return [status for status in health if status.enabled]
 
     def get_provider_chain(
         self, preferred_provider: ProviderType | None = None

@@ -304,3 +304,65 @@ class TestProviderFallback:
         error = exc_info.value
         assert error.attempted_providers == [ProviderType.OPENAI, ProviderType.XAI]
         assert isinstance(error.last_error, RuntimeError)
+
+
+class TestProviderHealth:
+    """Test provider health checks."""
+
+    def test_check_provider_health_ready(
+        self, providers_config_openai_only: ProvidersConfig, monkeypatch, mocker
+    ) -> None:
+        """Test provider is healthy when enabled, keyed, and model creation succeeds."""
+        manager = ProviderManager(providers_config_openai_only)
+        monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+        mocker.patch.object(manager, "get_model", return_value=object())
+
+        status = manager.check_provider_health(ProviderType.OPENAI)
+
+        assert status.enabled is True
+        assert status.api_key_present is True
+        assert status.healthy is True
+        assert status.reason == "Provider is ready"
+
+    def test_check_provider_health_missing_api_key(
+        self, providers_config_openai_only: ProvidersConfig, monkeypatch
+    ) -> None:
+        """Test provider is unhealthy when key is missing."""
+        manager = ProviderManager(providers_config_openai_only)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        status = manager.check_provider_health(ProviderType.OPENAI)
+
+        assert status.enabled is True
+        assert status.api_key_present is False
+        assert status.healthy is False
+        assert "Missing environment variable" in status.reason
+
+    def test_check_provider_health_disabled_provider(
+        self, providers_config_xai_disabled: ProvidersConfig, monkeypatch
+    ) -> None:
+        """Test disabled provider is reported as unhealthy."""
+        manager = ProviderManager(providers_config_xai_disabled)
+        monkeypatch.setenv("XAI_API_KEY", "test-xai-key")
+
+        status = manager.check_provider_health(ProviderType.XAI)
+
+        assert status.enabled is False
+        assert status.api_key_present is True
+        assert status.healthy is False
+        assert status.reason == "Provider disabled"
+
+    def test_get_providers_health_filters_disabled(
+        self, providers_config_xai_disabled: ProvidersConfig, monkeypatch, mocker
+    ) -> None:
+        """Test include_disabled flag filters disabled providers."""
+        manager = ProviderManager(providers_config_xai_disabled)
+        monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+        mocker.patch.object(manager, "get_model", return_value=object())
+
+        all_statuses = manager.get_providers_health(include_disabled=True)
+        enabled_only_statuses = manager.get_providers_health(include_disabled=False)
+
+        assert len(all_statuses) == 2
+        assert len(enabled_only_statuses) == 1
+        assert enabled_only_statuses[0].provider == ProviderType.OPENAI
