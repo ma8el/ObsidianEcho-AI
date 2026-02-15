@@ -183,6 +183,6 @@ class TestRequestIDInLogs:
         request_id = response.headers.get("X-Request-ID")
         assert request_id is not None
 
-        # Check that logs contain the request ID
-        log_messages = [record.message for record in caplog.records]
-        assert any(request_id in msg for msg in log_messages)
+        # Check that at least one captured log record carries the request ID.
+        # This avoids coupling the test to text/json formatter differences.
+        assert any(getattr(record, "request_id", None) == request_id for record in caplog.records)

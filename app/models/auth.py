@@ -1,12 +1,12 @@
 """Authentication models."""
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class APIKeyStatus(str, Enum):
+class APIKeyStatus(StrEnum):
     """API key status."""
 
     ACTIVE = "active"
