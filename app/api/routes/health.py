@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.api.middleware import get_current_api_key
+from app.api.middleware import get_authenticated_api_key
 from app.core.config import Settings, get_settings
 from app.models.auth import APIKey
 from app.models.providers import ProviderHealth
@@ -34,7 +34,7 @@ class ProviderHealthResponse(BaseModel):
 @router.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check(
     settings: Settings = Depends(get_settings),
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
 ) -> HealthResponse:
     """
     Health check endpoint.
@@ -56,7 +56,7 @@ async def health_check(
 @router.get("/health/providers", response_model=ProviderHealthResponse, tags=["System"])
 async def providers_health_check(
     settings: Settings = Depends(get_settings),
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
 ) -> ProviderHealthResponse:
     """
     Provider health check endpoint.

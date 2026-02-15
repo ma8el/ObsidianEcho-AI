@@ -1,9 +1,11 @@
 """Chat endpoint for testing provider integration."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from time import perf_counter
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.agents.chat import ChatAgent
-from app.api.middleware import get_current_api_key
+from app.api.middleware import get_authenticated_api_key
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.auth import APIKey
@@ -21,8 +23,9 @@ chat_agent = ChatAgent(provider_manager)
 
 @router.post("", response_model=ChatResponse)
 async def chat(
-    request: ChatRequest,
-    api_key: APIKey = Depends(get_current_api_key),
+    payload: ChatRequest,
+    http_request: Request,
+    api_key: APIKey = Depends(get_authenticated_api_key),
 ) -> ChatResponse:
     """
     Send a message to the chat agent and get a response.
@@ -40,17 +43,60 @@ async def chat(
         HTTPException: If provider is not configured or request fails
     """
     try:
+        start = perf_counter()
         response = await chat_agent.chat(
-            message=request.message,
-            provider=request.provider,
+            message=payload.message,
+            provider=payload.provider,
         )
+
+        history_service = getattr(http_request.app.state, "history_service", None)
+        if history_service is not None:
+            await history_service.record_execution(
+                request_id=getattr(http_request.state, "request_id", None),
+                api_key_id=api_key.key_id,
+                agent="chat",
+                status="completed",
+                provider=response.provider.value,
+                model=response.model,
+                duration_seconds=round(perf_counter() - start, 4),
+                tokens_used=None,
+                estimated_cost=None,
+            )
         return response
 
     except ProviderNotConfiguredError as e:
+        history_service = getattr(http_request.app.state, "history_service", None)
+        if history_service is not None:
+            await history_service.record_execution(
+                request_id=getattr(http_request.state, "request_id", None),
+                api_key_id=api_key.key_id,
+                agent="chat",
+                status="failed",
+                provider=payload.provider.value if payload.provider is not None else None,
+                model=None,
+                duration_seconds=None,
+                tokens_used=None,
+                estimated_cost=None,
+                error=str(e),
+            )
         logger.error("Provider not configured", extra={"error": str(e)})
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     except Exception as e:
+        history_service = getattr(http_request.app.state, "history_service", None)
+        if history_service is not None:
+            await history_service.record_execution(
+                request_id=getattr(http_request.state, "request_id", None),
+                api_key_id=api_key.key_id,
+                agent="chat",
+                status="failed",
+                provider=payload.provider.value if payload.provider is not None else None,
+                model=None,
+                duration_seconds=None,
+                tokens_used=None,
+                estimated_cost=None,
+                error=str(e),
+            )
         logger.error(
             "Chat request failed",
             extra={"error": str(e)},

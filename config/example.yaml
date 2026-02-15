@@ -78,3 +78,9 @@ providers:
 # task_queue:
 #   max_workers: 4
 #   task_timeout_seconds: 600
+
+# Request/Execution History
+history:
+  enabled: true
+  storage_dir: "data/history"
+  retention_days: 30

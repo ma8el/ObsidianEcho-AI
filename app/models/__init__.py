@@ -1,6 +1,13 @@
 """Data models for the application."""
 
 from app.models.auth import APIKey, APIKeyConfig, APIKeyStatus
+from app.models.history import (
+    ExecutionHistoryEntry,
+    ExecutionHistoryListResponse,
+    HistoryStatsResponse,
+    RequestHistoryEntry,
+    RequestHistoryListResponse,
+)
 from app.models.providers import (
     AgentResponse,
     ProviderType,
@@ -30,11 +37,16 @@ __all__ = [
     "APIKeyStatus",
     "AgentType",
     "ChatTaskRequest",
+    "ExecutionHistoryEntry",
+    "ExecutionHistoryListResponse",
+    "HistoryStatsResponse",
     "ProviderType",
     "ResearchTaskRequest",
     "ResearchDepth",
     "ResearchMetadata",
     "ResearchRequest",
+    "RequestHistoryEntry",
+    "RequestHistoryListResponse",
     "ResearchResponse",
     "SourceReference",
     "TaskListResponse",

@@ -36,6 +36,16 @@ class AuthConfig(BaseModel):
     api_keys: list[APIKeyConfig] = Field(default_factory=list, description="List of valid API keys")
 
 
+class HistoryConfig(BaseModel):
+    """Request/execution history configuration."""
+
+    enabled: bool = Field(default=True, description="Whether history tracking is enabled")
+    storage_dir: str = Field(
+        default="data/history", description="Directory for history JSONL files"
+    )
+    retention_days: int = Field(default=30, description="Retention window for history files")
+
+
 class Settings(BaseSettings):
     """Application settings."""
 
@@ -62,6 +72,11 @@ class Settings(BaseSettings):
 
     # Authentication
     auth: AuthConfig = Field(default_factory=AuthConfig, description="Authentication configuration")
+
+    # History
+    history: HistoryConfig = Field(
+        default_factory=HistoryConfig, description="Request/execution history configuration"
+    )
 
     # Configuration file path
     config_file: str = Field(
@@ -102,6 +117,8 @@ class Settings(BaseSettings):
                     self.providers = ProvidersConfig(**value)
                 elif key == "auth" and isinstance(value, dict):
                     self.auth = AuthConfig(**value)
+                elif key == "history" and isinstance(value, dict):
+                    self.history = HistoryConfig(**value)
                 else:
                     setattr(self, key, value)
 
