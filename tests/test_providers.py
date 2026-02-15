@@ -1,6 +1,7 @@
 """Tests for provider management."""
 
 import pytest
+from agno.models.xai import xAI
 
 from app.core.config import ProviderConfig, ProvidersConfig
 from app.models.providers import ProviderType
@@ -304,6 +305,27 @@ class TestProviderFallback:
         error = exc_info.value
         assert error.attempted_providers == [ProviderType.OPENAI, ProviderType.XAI]
         assert isinstance(error.last_error, RuntimeError)
+
+
+class TestResearchModelSelection:
+    """Test research-specific provider model selection."""
+
+    def test_get_openai_research_model(self, providers_config_openai_only: ProvidersConfig) -> None:
+        """OpenAI research model should use Responses API wrapper."""
+        manager = ProviderManager(providers_config_openai_only)
+        model = manager.get_research_model(ProviderType.OPENAI)
+
+        from agno.models.openai.responses import OpenAIResponses
+
+        assert isinstance(model, OpenAIResponses)
+
+    def test_get_xai_research_model(self, providers_config_both: ProvidersConfig) -> None:
+        """xAI research model should include search parameters."""
+        manager = ProviderManager(providers_config_both)
+        model = manager.get_research_model(ProviderType.XAI)
+
+        assert isinstance(model, xAI)
+        assert model.search_parameters == {"mode": "on"}
 
 
 class TestProviderHealth:

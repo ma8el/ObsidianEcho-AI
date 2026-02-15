@@ -5,11 +5,13 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from agno.models.openai import OpenAIChat
+from agno.models.openai.responses import OpenAIResponses
 from agno.models.xai import xAI
 
 from app.core.config import ProvidersConfig
 from app.core.logging import get_logger
 from app.models.providers import ProviderHealth, ProviderType
+from app.models.research import ResearchDepth
 
 logger = get_logger(__name__)
 
@@ -144,6 +146,32 @@ class ProviderManager:
             exponential_backoff=True,
         )
 
+    def _get_openai_research_model(self, depth: ResearchDepth) -> OpenAIResponses:
+        """
+        Get OpenAI Responses API model configured for research workflows.
+
+        Uses native web-search tool integration.
+        """
+        if not self.config.openai or not self.config.openai.enabled:
+            raise ProviderNotConfiguredError("OpenAI provider is not configured or enabled")
+
+        config = self.config.openai
+        request_params: dict[str, list[dict[str, str]]] = {}
+
+        # For non deep-research models, explicitly attach web_search_preview.
+        if "deep-research" not in config.model:
+            request_params["tools"] = [{"type": "web_search_preview"}]
+
+        return OpenAIResponses(
+            id=config.model,
+            timeout=config.timeout_seconds,
+            max_retries=config.max_retries,
+            retries=config.max_retries,
+            delay_between_retries=1,
+            exponential_backoff=True,
+            request_params=request_params or None,
+        )
+
     def _get_xai_model(self) -> xAI:
         """
         Get xAI model instance.
@@ -167,6 +195,26 @@ class ProviderManager:
             retries=config.max_retries,
             delay_between_retries=1,
             exponential_backoff=True,
+        )
+
+    def _get_xai_research_model(self) -> xAI:
+        """
+        Get xAI model configured for research workflows.
+
+        Enables provider-native live search parameters.
+        """
+        if not self.config.xai or not self.config.xai.enabled:
+            raise ProviderNotConfiguredError("XAI provider is not configured or enabled")
+
+        config = self.config.xai
+        return xAI(
+            id=config.model,
+            timeout=config.timeout_seconds,
+            max_retries=config.max_retries,
+            retries=config.max_retries,
+            delay_between_retries=1,
+            exponential_backoff=True,
+            search_parameters={"mode": "on"},
         )
 
     def get_available_providers(self) -> list[ProviderType]:
@@ -234,6 +282,37 @@ class ProviderManager:
             return self.config.xai.model
         else:
             raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+    def get_research_model(
+        self, provider: ProviderType | None = None, depth: ResearchDepth = ResearchDepth.STANDARD
+    ) -> OpenAIResponses | xAI:
+        """
+        Get a research-configured model with native web-search capabilities.
+
+        Args:
+            provider: Provider type, or None to use default
+            depth: Research depth (kept for future provider-specific tuning)
+        """
+        if provider is None:
+            provider = self.get_default_provider()
+
+        if provider == ProviderType.OPENAI:
+            return self._get_openai_research_model(depth=depth)
+        elif provider == ProviderType.XAI:
+            return self._get_xai_research_model()
+        else:
+            raise ProviderNotConfiguredError(f"Unsupported provider: {provider.value}")
+
+    def get_research_model_name(self, provider: ProviderType, depth: ResearchDepth) -> str:
+        """
+        Get model name for research execution.
+
+        Args:
+            provider: Provider type
+            depth: Research depth (reserved for future specialized model mapping)
+        """
+        _ = depth
+        return self.get_model_name(provider)
 
     def check_provider_health(self, provider: ProviderType) -> ProviderHealth:
         """

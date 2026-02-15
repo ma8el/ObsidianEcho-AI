@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.middleware import RequestIDMiddleware
-from app.api.routes import chat_router, health_router
+from app.api.routes import chat_router, health_router, research_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
 
@@ -64,6 +64,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(chat_router)
+    app.include_router(research_router)
 
     logger.info("FastAPI application created successfully")
 
