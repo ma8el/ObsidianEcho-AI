@@ -4,7 +4,11 @@ import pytest
 
 from app.core.config import ProviderConfig, ProvidersConfig
 from app.models.providers import ProviderType
-from app.services.providers import ProviderManager, ProviderNotConfiguredError
+from app.services.providers import (
+    ProviderExecutionError,
+    ProviderManager,
+    ProviderNotConfiguredError,
+)
 
 
 @pytest.fixture
@@ -113,6 +117,27 @@ class TestGetModel:
 
         assert isinstance(model, OpenAIChat)
 
+    def test_openai_model_uses_configured_timeout_and_retries(
+        self, providers_config_openai_only: ProvidersConfig, mocker
+    ) -> None:
+        """Test OpenAI model creation uses timeout/retry configuration."""
+        manager = ProviderManager(providers_config_openai_only)
+        mock_openai = mocker.patch("app.services.providers.OpenAIChat")
+        sentinel_model = object()
+        mock_openai.return_value = sentinel_model
+
+        model = manager.get_model(ProviderType.OPENAI)
+
+        assert model is sentinel_model
+        mock_openai.assert_called_once_with(
+            id="gpt-4o",
+            timeout=30,
+            max_retries=2,
+            retries=2,
+            delay_between_retries=1,
+            exponential_backoff=True,
+        )
+
     def test_get_xai_model(self, providers_config_both: ProvidersConfig) -> None:
         """Test getting XAI model instance."""
         manager = ProviderManager(providers_config_both)
@@ -122,6 +147,27 @@ class TestGetModel:
         from agno.models.xai import xAI
 
         assert isinstance(model, xAI)
+
+    def test_xai_model_uses_configured_timeout_and_retries(
+        self, providers_config_both: ProvidersConfig, mocker
+    ) -> None:
+        """Test XAI model creation uses timeout/retry configuration."""
+        manager = ProviderManager(providers_config_both)
+        mock_xai = mocker.patch("app.services.providers.xAI")
+        sentinel_model = object()
+        mock_xai.return_value = sentinel_model
+
+        model = manager.get_model(ProviderType.XAI)
+
+        assert model is sentinel_model
+        mock_xai.assert_called_once_with(
+            id="grok-beta",
+            timeout=30,
+            max_retries=2,
+            retries=2,
+            delay_between_retries=1,
+            exponential_backoff=True,
+        )
 
     def test_get_default_provider_model(
         self, providers_config_openai_only: ProvidersConfig
@@ -214,3 +260,47 @@ class TestAvailableProviders:
         manager = ProviderManager(config)
         available = manager.get_available_providers()
         assert len(available) == 0
+
+
+class TestProviderFallback:
+    """Test provider runtime fallback behavior."""
+
+    @pytest.mark.asyncio
+    async def test_run_with_fallback_uses_second_provider_on_failure(
+        self, providers_config_both: ProvidersConfig
+    ) -> None:
+        """Test fallback to next provider when primary fails."""
+        manager = ProviderManager(providers_config_both)
+
+        async def operation(provider: ProviderType) -> str:
+            if provider == ProviderType.OPENAI:
+                raise RuntimeError("OpenAI unavailable")
+            return f"ok:{provider.value}"
+
+        result, used_provider = await manager.run_with_fallback(
+            operation=operation,
+            preferred_provider=ProviderType.OPENAI,
+        )
+
+        assert result == "ok:xai"
+        assert used_provider == ProviderType.XAI
+
+    @pytest.mark.asyncio
+    async def test_run_with_fallback_raises_after_all_fail(
+        self, providers_config_both: ProvidersConfig
+    ) -> None:
+        """Test error when all providers fail during execution."""
+        manager = ProviderManager(providers_config_both)
+
+        async def operation(provider: ProviderType) -> str:
+            raise RuntimeError(f"{provider.value} failed")
+
+        with pytest.raises(ProviderExecutionError) as exc_info:
+            await manager.run_with_fallback(
+                operation=operation,
+                preferred_provider=ProviderType.OPENAI,
+            )
+
+        error = exc_info.value
+        assert error.attempted_providers == [ProviderType.OPENAI, ProviderType.XAI]
+        assert isinstance(error.last_error, RuntimeError)

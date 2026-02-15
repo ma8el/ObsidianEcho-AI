@@ -27,6 +27,21 @@ class ChatAgent:
         """
         self.provider_manager = provider_manager
 
+    async def _chat_with_provider(self, message: str, provider: ProviderType) -> tuple[str, str]:
+        """Execute a chat request with a specific provider."""
+        model = self.provider_manager.get_model(provider)
+        model_name = self.provider_manager.get_model_name(provider)
+
+        agent = Agent(
+            model=model,
+            instructions="You are a helpful AI assistant. Be concise and friendly.",
+            markdown=True,
+        )
+
+        response = await agent.arun(message)
+        reply = str(response.content) if hasattr(response, "content") else str(response)
+        return reply, model_name
+
     async def chat(self, message: str, provider: ProviderType | None = None) -> ChatResponse:
         """
         Send a message and get a response.
@@ -38,39 +53,25 @@ class ChatAgent:
         Returns:
             Chat response with reply and metadata
         """
-        # Use default provider if none specified
-        if provider is None:
-            provider = self.provider_manager.get_default_provider()
+        requested_provider = provider.value if provider is not None else "default"
+        logger.info("Processing chat message", extra={"requested_provider": requested_provider})
 
-        # Get model and model name from provider manager
-        model = self.provider_manager.get_model(provider)
-        model_name = self.provider_manager.get_model_name(provider)
-
-        logger.info(
-            "Processing chat message",
-            extra={"provider": provider.value, "model": model_name},
+        (reply, model_name), used_provider = await self.provider_manager.run_with_fallback(
+            operation=lambda candidate: self._chat_with_provider(message, candidate),
+            preferred_provider=provider,
         )
-
-        # Create agent with the model
-        agent = Agent(
-            model=model,
-            instructions="You are a helpful AI assistant. Be concise and friendly.",
-            markdown=True,
-        )
-
-        # Run the agent asynchronously
-        response = await agent.arun(message)
-
-        # Extract the response content
-        reply = str(response.content) if hasattr(response, "content") else str(response)
 
         logger.info(
             "Chat message processed successfully",
-            extra={"provider": provider.value, "reply_length": len(reply)},
+            extra={
+                "provider": used_provider.value,
+                "model": model_name,
+                "reply_length": len(reply),
+            },
         )
 
         return ChatResponse(
             reply=reply,
-            provider=provider,
+            provider=used_provider,
             model=model_name,
         )
