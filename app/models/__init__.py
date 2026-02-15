@@ -12,16 +12,34 @@ from app.models.research import (
     ResearchResponse,
     SourceReference,
 )
+from app.models.tasks import (
+    AgentType,
+    ChatTaskRequest,
+    ResearchTaskRequest,
+    TaskListResponse,
+    TaskResultResponse,
+    TaskStatus,
+    TaskStatusResponse,
+    TaskSubmissionResponse,
+)
 
 __all__ = [
     "AgentResponse",
     "APIKey",
     "APIKeyConfig",
     "APIKeyStatus",
+    "AgentType",
+    "ChatTaskRequest",
     "ProviderType",
+    "ResearchTaskRequest",
     "ResearchDepth",
     "ResearchMetadata",
     "ResearchRequest",
     "ResearchResponse",
     "SourceReference",
+    "TaskListResponse",
+    "TaskResultResponse",
+    "TaskStatus",
+    "TaskStatusResponse",
+    "TaskSubmissionResponse",
 ]
