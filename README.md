@@ -119,8 +119,8 @@ This project is currently being built following the implementation stories in [d
 - [ ] ~~**Story 7**: Template Agent API Endpoints~~ (deferred)
 - [x] **Story 8**: Asynchronous Task Queue System
 - [x] **Story 9**: Task Management API Endpoints
-- [ ] **Story 10**: Rate Limiting System
-- [ ] **Story 11**: Request History & Logging
+- [x] **Story 10**: Rate Limiting System
+- [x] **Story 11**: Request History & Logging
 - [ ] **Story 12**: Webhook Notification System
 
 See [docs/STORIES.md](docs/STORIES.md) for complete roadmap.

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.agents.chat import ChatAgent
 from app.agents.research import ResearchAgent
-from app.api.middleware import get_current_api_key
+from app.api.middleware import get_authenticated_api_key
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.models.auth import APIKey
@@ -73,7 +73,7 @@ def get_task_manager(request: Request) -> TaskManager:
 @router.post("", response_model=TaskSubmissionResponse, status_code=status.HTTP_202_ACCEPTED)
 async def submit_task(
     request: TaskRequest,
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> TaskSubmissionResponse:
     """Submit a task for asynchronous processing."""
@@ -88,7 +88,7 @@ async def submit_task(
 @router.get("/{task_id}", response_model=TaskStatusResponse)
 async def get_task_status(
     task_id: str,
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> TaskStatusResponse:
     """Get task status."""
@@ -101,7 +101,7 @@ async def get_task_status(
 @router.get("/{task_id}/result", response_model=TaskResultResponse)
 async def get_task_result(
     task_id: str,
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> TaskResultResponse:
     """Get completed task result."""
@@ -116,7 +116,7 @@ async def get_task_result(
 @router.delete("/{task_id}", response_model=TaskStatusResponse)
 async def cancel_task(
     task_id: str,
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> TaskStatusResponse:
     """Cancel a task if still pending/processing."""
@@ -134,7 +134,7 @@ async def list_tasks(
     agent: AgentType | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    api_key: APIKey = Depends(get_current_api_key),
+    api_key: APIKey = Depends(get_authenticated_api_key),
     task_manager: TaskManager = Depends(get_task_manager),
 ) -> TaskListResponse:
     """List tasks owned by API key with filtering and pagination."""

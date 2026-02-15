@@ -45,6 +45,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         # Store in context variable for logging
         request_id_context.set(req_id)
+        history_service = getattr(request.app.state, "history_service", None)
 
         # Log request
         start_time = time.time()
@@ -62,6 +63,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception as exc:
+            duration_ms = (time.time() - start_time) * 1000
+
             # Log error with request ID
             logger.error(
                 "Request failed with exception",
@@ -73,6 +76,18 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
                 },
                 exc_info=True,
             )
+
+            if history_service is not None:
+                await history_service.record_request(
+                    request_id=req_id,
+                    api_key_id=getattr(request.state, "api_key_id", None),
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=500,
+                    duration_ms=duration_ms,
+                    client=request.client.host if request.client else None,
+                    error=str(exc),
+                )
             raise
 
         # Calculate duration
@@ -80,6 +95,10 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         # Add request ID to response headers
         response.headers["X-Request-ID"] = req_id
+        rate_limit_headers = getattr(request.state, "rate_limit_headers", None)
+        if isinstance(rate_limit_headers, dict):
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
 
         # Log response
         logger.info(
@@ -92,6 +111,17 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
                 "duration_ms": round(duration_ms, 2),
             },
         )
+
+        if history_service is not None:
+            await history_service.record_request(
+                request_id=req_id,
+                api_key_id=getattr(request.state, "api_key_id", None),
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+                client=request.client.host if request.client else None,
+            )
 
         return response
 
