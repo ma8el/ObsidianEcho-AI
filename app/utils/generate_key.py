@@ -48,8 +48,8 @@ def main() -> None:
         print("# Add to your config/main.yaml under auth.api_keys:")
         for i in range(args.number):
             key = generate_api_key()
-            print(f'  - key_id: "key-{i+1}"')
-            print(f'    name: "API Key {i+1}"')
+            print(f'  - key_id: "key-{i + 1}"')
+            print(f'    name: "API Key {i + 1}"')
             if args.yaml_hashed:
                 print(f'    key_hash: "{hash_api_key(key)}"')
             else:
