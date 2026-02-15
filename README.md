@@ -110,9 +110,9 @@ This project is currently being built following the implementation stories in [d
 
 ### Roadmap
 
-- [ ] **Story 1**: Project Foundation & Setup
-- [ ] **Story 2**: AI Provider Integration with agno
-- [ ] **Story 3**: API Authentication & Security
+- [x] **Story 1**: Project Foundation & Setup
+- [x] **Story 2**: AI Provider Integration with agno
+- [x] **Story 3**: API Authentication & Security
 - [ ] **Story 4**: Research Agent Core Implementation
 - [ ] **Story 5**: Research Agent API Endpoints
 - [ ] **Story 6**: Template Agent with Jinja2

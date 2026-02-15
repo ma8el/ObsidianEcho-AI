@@ -3,10 +3,11 @@
 import pytest
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api.middleware.auth import get_current_api_key
 from app.core.config import AuthConfig, Settings
-from app.core.security import generate_api_key
+from app.core.security import generate_api_key, hash_api_key
 from app.main import create_app
 from app.models.auth import APIKeyConfig, APIKeyStatus
 
@@ -27,6 +28,22 @@ def auth_config(test_api_key):
                 key_id="test-key-1",
                 name="Test Key 1",
                 key=test_api_key,
+                status=APIKeyStatus.ACTIVE,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def auth_config_hashed(test_api_key):
+    """Create test auth configuration with hashed API key storage."""
+    return AuthConfig(
+        enabled=True,
+        api_keys=[
+            APIKeyConfig(
+                key_id="test-key-hashed",
+                name="Test Key Hashed",
+                key_hash=hash_api_key(test_api_key),
                 status=APIKeyStatus.ACTIVE,
             ),
         ],
@@ -68,6 +85,20 @@ class TestAuthenticationMiddleware:
         result = await get_current_api_key(x_api_key=test_api_key)
         assert result.key_id == "test-key-1"
         assert result.name == "Test Key 1"
+        assert result.status == APIKeyStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_valid_api_key_with_hashed_storage(
+        self, mocker, test_api_key, auth_config_hashed
+    ):
+        """Test authentication with API key stored as hash."""
+        settings = Settings()
+        settings.auth = auth_config_hashed
+        mocker.patch("app.api.middleware.auth.get_settings", return_value=settings)
+
+        result = await get_current_api_key(x_api_key=test_api_key)
+        assert result.key_id == "test-key-hashed"
+        assert result.name == "Test Key Hashed"
         assert result.status == APIKeyStatus.ACTIVE
 
     @pytest.mark.asyncio
@@ -215,3 +246,38 @@ class TestAuthenticationIntegration:
 
         response = client.get("/health")
         assert response.status_code == 200
+
+
+class TestAPIKeyConfigValidation:
+    """Validation tests for API key configuration model."""
+
+    def test_accepts_hashed_key(self) -> None:
+        """APIKeyConfig should accept a SHA-256 key hash."""
+        config = APIKeyConfig(
+            key_id="hashed",
+            name="Hashed Key",
+            key_hash="A" * 64,
+            status=APIKeyStatus.ACTIVE,
+        )
+        assert config.key is None
+        assert config.key_hash == "a" * 64
+
+    def test_rejects_missing_key_material(self) -> None:
+        """APIKeyConfig should reject entries with no key material."""
+        with pytest.raises(ValidationError):
+            APIKeyConfig(
+                key_id="missing",
+                name="Missing",
+                status=APIKeyStatus.ACTIVE,
+            )
+
+    def test_rejects_both_key_and_key_hash(self) -> None:
+        """APIKeyConfig should reject entries with both key and key_hash."""
+        with pytest.raises(ValidationError):
+            APIKeyConfig(
+                key_id="both",
+                name="Both",
+                key="oea_0123456789abcdef0123456789abcdef",
+                key_hash="a" * 64,
+                status=APIKeyStatus.ACTIVE,
+            )

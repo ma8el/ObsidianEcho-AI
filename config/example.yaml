@@ -27,12 +27,15 @@ auth:
     # Format: oea_<32 hex characters>
     - key_id: "production-key-1"
       name: "Production API Key"
+      # Use one of:
+      # key: "oea_..."        (plain key; easier local setup)
+      # key_hash: "<sha256>"  (recommended for persisted config)
       key: "oea_0123456789abcdef0123456789abcdef"  # CHANGE THIS!
       status: "active"  # active or revoked
     # You can add multiple keys for different services/users
     # - key_id: "service-key-1"
     #   name: "Integration Service"
-    #   key: "oea_abcdef0123456789abcdef0123456789"
+    #   key_hash: "d4f38f..."  # 64-char SHA-256 hex
     #   status: "active"
 
 # AI Provider Settings

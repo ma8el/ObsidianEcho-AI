@@ -78,7 +78,12 @@ async def get_current_api_key(
     # Find matching key in configuration
     stored_key = None
     for key_config in settings.auth.api_keys:
-        config_hash = hash_api_key(key_config.key)
+        config_hash = key_config.key_hash
+        if config_hash is None:
+            if key_config.key is None:
+                continue
+            config_hash = hash_api_key(key_config.key)
+
         if config_hash == key_hash:
             stored_key = APIKey(
                 key_id=key_config.key_id,
